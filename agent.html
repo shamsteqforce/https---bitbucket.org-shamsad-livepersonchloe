@@ -1,0 +1,109 @@
+<html>
+
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.0.0/jquery.min.js"></script>
+    <script type="text/javascript" src="https://lpcdn.lpsnmedia.net/webagent/client-SDK.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="style.css" />   
+    <script type="text/javascript">
+        function getParameterByName(name, url) {
+            if (!url) url = window.location.href;
+            name = name.replace(/[\[\]]/g, "\\$&");
+            var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+                results = regex.exec(url);
+            if (!results) return null;
+            if (!results[2]) return '';
+            return decodeURIComponent(results[2].replace(/\+/g, " "));
+        }
+        // this is a function that takes two arguments: elementId and path
+        // elementId: the element ID in the DOM that you want to insert the data into
+        // path: the path to the data in the Widget SDK's documentation
+        lpTag.agentSDK.init();
+        var bindDataToElement = function(elementId, path) {
+            lpTag.agentSDK.bind(path,
+                function(data) {
+                    var source = data.newValue[0].source;
+                    var text = data.newValue[0].text;
+                    if (source == 'visitor') {
+                        getAccessToken(text);
+                        document.getElementById(elementId).innerHTML = path == 'chatTranscript.lines' ? data.newValue[data.newValue.length - 1].text : data.newValue;
+                        document.getElementById('chloeReply').innerHTML = "<span class='error'>Please wait while Chloe reply..............</span><center><img src='loader_dark.gif' alt='In Process' /></center>";
+                    }
+                },
+                function(err) {
+                    console.log(err)
+                })
+        }
+
+
+        var header = {
+            "Content-type": "application/json"
+        };
+        var chloeAuthUrl = "https://dialog-beta.sundown.ai/webchloe/rest/auth/get-access-token";
+        var chloeConverseUrl = "https://dialog-beta.sundown.ai/webchloe/rest/dialog/converse";
+        //var dialogId = "703e57c7930245e1b76332a5293d3105";
+        //var channel = "test";
+        //var credentials="b9c32ca8631244f6b40434a77196231b";
+        var dialogId = getParameterByName('dialogId');
+        var channel = getParameterByName('channel');
+        var credentials = getParameterByName('credentials');
+
+        function getAccessToken(question) {
+            var accessToken;
+            var data = {
+                "credentials": credentials
+            };
+            $.ajax({
+                url: chloeAuthUrl,
+                type: 'post',
+                data: JSON.stringify(data),
+                headers: header,
+                dataType: 'json',
+                success: function(data) {
+                    var jsonData = JSON.stringify(data);
+                    accessToken = data['access-token'];
+                    getChloeAnswer(accessToken, question);
+                }
+            });
+        }
+
+
+        function getChloeAnswer(accessToken, question) {
+            var data = {
+                "input": question,
+                "conversation-id": null,
+                "dialog-id": dialogId,
+                "channel": channel,
+                "access-token": accessToken,
+                "ignore-flow": false,
+                "policy-id": ""
+
+            }
+            $.ajax({
+                url: chloeConverseUrl,
+                type: 'post',
+                data: JSON.stringify(data),
+                headers: header,
+                dataType: 'json',
+                success: function(data) {
+                    var answer = data['output'];
+                    if (answer == null)
+                        document.getElementById('chloeReply').innerHTML = "No answer found in Chloe. Thanks";
+                    else
+                        document.getElementById('chloeReply').innerHTML = answer;
+                }
+            });
+
+        }
+    </script>
+</head>
+
+<body <div>
+    <p class="main">Visitor's Questions: <br/><br/><span id="transcriptLine" class="success"></span></p>
+    <p class="main">Chloe Suggestions: <br/><br/><span id="chloeReply" class="success"></span></p>
+    </div>
+    <script type="text/javascript">
+        bindDataToElement('transcriptLine', 'chatTranscript.lines');
+    </script>
+</body>
+
+</html>
